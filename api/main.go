@@ -9,8 +9,9 @@ import (
 )
 
 type ExecuteRequest struct {
-	Code  string `json:"code"`
-	Input string `json:"input"`
+	Language string `json:"language"`
+	Code     string `json:"code"`
+	Input    string `json:"input"`
 }
 
 type ExecuteResponse struct {
@@ -30,7 +31,22 @@ func main() {
 			return
 		}
 
-		output, err := executor.ExecutePython(req.Code, req.Input)
+		var output string
+		var err error
+
+		switch req.Language {
+		case "python":
+			output, err = executor.ExecutePython(req.Code, req.Input)
+
+		case "javascript":
+			output, err = executor.ExecuteJavaScript(req.Code, req.Input)
+
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "unsupported language",
+			})
+			return
+		}
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
