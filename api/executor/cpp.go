@@ -8,19 +8,17 @@ import (
 	"time"
 )
 
-type PythonExecutor struct{}
+type CPPExecutor struct{}
 
-func (p PythonExecutor) Execute(code string, input string) (string, error) {
-	// Create temporary Python file
-	tempFile, err := os.CreateTemp("", "code-*.py")
+func (c CPPExecutor) Execute(code string, input string) (string, error) {
+	// Create temp cpp file
+	tempFile, err := os.CreateTemp("", "code-*.cpp")
 	if err != nil {
 		return "", err
 	}
 
-	// Cleanup temp file after execution
 	defer os.Remove(tempFile.Name())
 
-	// Write code into file
 	_, err = tempFile.WriteString(code)
 	if err != nil {
 		return "", err
@@ -28,11 +26,11 @@ func (p PythonExecutor) Execute(code string, input string) (string, error) {
 
 	tempFile.Close()
 
-	// Create timeout context
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Create timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Docker execution command
+	// Docker compile + execute command
 	cmd := exec.CommandContext(
 		ctx,
 		"docker",
@@ -40,36 +38,32 @@ func (p PythonExecutor) Execute(code string, input string) (string, error) {
 		"-i",
 		"--rm",
 		"--network=none",
-		"--memory=128m",
-		"--cpus=0.5",
+		"--memory=256m",
+		"--cpus=1",
 		"-v",
-		tempFile.Name()+":/app/main.py",
-		"execution-python",
-		"python",
-		"/app/main.py",
+		tempFile.Name()+":/app/main.cpp",
+		"execution-cpp",
+		"sh",
+		"-c",
+		"g++ /app/main.cpp -o /app/main && /app/main",
 	)
 
-	// Create stdin pipe
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return "", err
 	}
 
-	// Send input to container
 	go func() {
 		defer stdin.Close()
 		stdin.Write([]byte(input))
 	}()
 
-	// Execute command
 	output, err := cmd.CombinedOutput()
 
-	// Handle timeout
 	if ctx.Err() == context.DeadlineExceeded {
 		return "", errors.New("execution timed out")
 	}
 
-	// Return stderr/stdout together
 	if err != nil {
 		return string(output), err
 	}

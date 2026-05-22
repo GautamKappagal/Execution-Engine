@@ -8,7 +8,9 @@ import (
 	"time"
 )
 
-func ExecuteJavaScript(code string, input string) (string, error) {
+type JavaScriptExecutor struct{}
+
+func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
 	// Create temporary JavaScript file
 	tempFile, err := os.CreateTemp("", "code-*.js")
 	if err != nil {

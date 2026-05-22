@@ -31,22 +31,16 @@ func main() {
 			return
 		}
 
-		var output string
-		var err error
+		exec, exists := executor.Executors[req.Language]
 
-		switch req.Language {
-		case "python":
-			output, err = executor.ExecutePython(req.Code, req.Input)
-
-		case "javascript":
-			output, err = executor.ExecuteJavaScript(req.Code, req.Input)
-
-		default:
+		if !exists {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "unsupported language",
 			})
 			return
 		}
+
+		output, err := exec.Execute(req.Code, req.Input)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
