@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"execution-engine-api/executor"
+	"execution-engine-api/models"
+	"execution-engine-api/redis"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type ExecuteRequest struct {
@@ -31,7 +35,7 @@ func main() {
 			return
 		}
 
-		exec, exists := executor.Executors[req.Language]
+		_, exists := executor.Executors[req.Language]
 
 		if !exists {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -40,18 +44,32 @@ func main() {
 			return
 		}
 
-		output, err := exec.Execute(req.Code, req.Input)
+		job := models.ExecutionJob{
+			ID:       uuid.New().String(),
+			Language: req.Language,
+			Code:     req.Code,
+			Input:    req.Input,
+		}
 
+		jobJSON, err := json.Marshal(job)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":  err.Error(),
-				"output": output,
+				"error": "failed to serialize job",
 			})
 			return
 		}
 
-		c.JSON(http.StatusOK, ExecuteResponse{
-			Output: output,
+		err = redis.Client.RPush(redis.Ctx, "execution_queue", jobJSON).Err()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to enqueue job",
+			})
+			return
+		}
+
+		c.JSON(http.StatusAccepted, gin.H{
+			"message": "job queued",
+			"job_id":  job.ID,
 		})
 	})
 
