@@ -60,10 +60,43 @@ func main() {
 		}
 
 		err = redis.Client.RPush(redis.Ctx, "execution_queue", jobJSON).Err()
+
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "failed to enqueue job",
 			})
+
+			return
+		}
+
+		result := models.ExecutionResult{
+			ID:     job.ID,
+			Status: "queued",
+			Output: "",
+			Error:  "",
+		}
+
+		resultJSON, err := json.Marshal(result)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to serialize result",
+			})
+
+			return
+		}
+
+		err = redis.Client.Set(
+			redis.Ctx,
+			"result:"+job.ID,
+			resultJSON,
+			0,
+		).Err()
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to store result",
+			})
+
 			return
 		}
 
@@ -71,6 +104,34 @@ func main() {
 			"message": "job queued",
 			"job_id":  job.ID,
 		})
+	})
+
+	r.GET("/result/:id", func(c *gin.Context) {
+		id := c.Param("id")
+
+		resultJSON, err := redis.Client.Get(
+			redis.Ctx,
+			"result:"+id,
+		).Result()
+
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "result not found",
+			})
+			return
+		}
+
+		var result models.ExecutionResult
+
+		err = json.Unmarshal([]byte(resultJSON), &result)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to parse result",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
 	})
 
 	r.Run(":8080")

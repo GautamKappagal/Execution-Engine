@@ -39,6 +39,22 @@ func main() {
 
 		fmt.Println("Executing job:", job.ID)
 
+		runningResult := models.ExecutionResult{
+			ID:     job.ID,
+			Status: "running",
+			Output: "",
+			Error:  "",
+		}
+
+		runningJSON, _ := json.Marshal(runningResult)
+
+		client.Set(
+			ctx,
+			"result:"+job.ID,
+			runningJSON,
+			0,
+		)
+
 		exec, exists := executor.Executors[job.Language]
 		if !exists {
 			fmt.Println("Unsupported language:", job.Language)
@@ -48,11 +64,43 @@ func main() {
 		output, err := exec.Execute(job.Code, job.Input)
 		if err != nil {
 			fmt.Println("Execution error:", err)
-			fmt.Println("Output:", output)
+
+			failedResult := models.ExecutionResult{
+				ID:     job.ID,
+				Status: "failed",
+				Output: output,
+				Error:  err.Error(),
+			}
+
+			failedJSON, _ := json.Marshal(failedResult)
+
+			client.Set(
+				ctx,
+				"result:"+job.ID,
+				failedJSON,
+				0,
+			)
+
 			continue
 		}
 
 		fmt.Println("Execution output:")
 		fmt.Println(output)
+
+		completedResult := models.ExecutionResult{
+			ID:     job.ID,
+			Status: "completed",
+			Output: output,
+			Error:  "",
+		}
+
+		completedJSON, _ := json.Marshal(completedResult)
+
+		client.Set(
+			ctx,
+			"result:"+job.ID,
+			completedJSON,
+			0,
+		)
 	}
 }
