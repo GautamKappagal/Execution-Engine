@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 type ExecuteRequest struct {
@@ -20,6 +21,12 @@ type ExecuteRequest struct {
 
 type ExecuteResponse struct {
 	Output string `json:"output"`
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 func main() {
@@ -132,6 +139,37 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, result)
+	})
+
+	r.GET("/ws/:id", func(c *gin.Context) {
+		jobID := c.Param("id")
+
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			return
+		}
+
+		defer conn.Close()
+
+		pubsub := redis.Client.Subscribe(
+			redis.Ctx,
+			"logs:"+jobID,
+		)
+
+		defer pubsub.Close()
+
+		ch := pubsub.Channel()
+
+		for msg := range ch {
+			err := conn.WriteMessage(
+				websocket.TextMessage,
+				[]byte(msg.Payload),
+			)
+
+			if err != nil {
+				break
+			}
+		}
 	})
 
 	r.Run(":8080")

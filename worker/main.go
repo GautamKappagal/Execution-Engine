@@ -87,6 +87,12 @@ func main() {
 		fmt.Println("Execution output:")
 		fmt.Println(output)
 
+		client.Publish(
+			ctx,
+			"logs:"+job.ID,
+			output,
+		)
+
 		completedResult := models.ExecutionResult{
 			ID:     job.ID,
 			Status: "completed",
