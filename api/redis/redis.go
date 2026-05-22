@@ -9,5 +9,5 @@ import (
 var Ctx = context.Background()
 
 var Client = goredis.NewClient(&goredis.Options{
-	Addr: "localhost:6379",
+	Addr: "redis:6379",
 })

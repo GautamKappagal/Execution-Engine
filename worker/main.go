@@ -15,7 +15,7 @@ var ctx = context.Background()
 
 func main() {
 	client := goredis.NewClient(&goredis.Options{
-		Addr: "localhost:6379",
+		Addr: "redis:6379",
 	})
 
 	fmt.Println("Worker started. Waiting for jobs...")
