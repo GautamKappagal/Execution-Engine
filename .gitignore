@@ -1,0 +1,16 @@
+# Go
+bin/
+*.exe
+*.out
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
+
+# Environment files
+.env
+
+# Temporary files
+tmp/
