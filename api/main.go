@@ -29,6 +29,11 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+const (
+	MaxCodeSize  = 10000
+	MaxInputSize = 5000
+)
+
 func main() {
 	r := gin.Default()
 
@@ -39,6 +44,21 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "invalid request",
 			})
+
+			return
+		}
+
+		if len(req.Code) > MaxCodeSize {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "code exceeds maximum allowed size",
+			})
+			return
+		}
+
+		if len(req.Input) > MaxInputSize {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "input exceeds maximum allowed size",
+			})
 			return
 		}
 
@@ -48,6 +68,7 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "unsupported language",
 			})
+
 			return
 		}
 
@@ -63,6 +84,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "failed to serialize job",
 			})
+
 			return
 		}
 
@@ -125,6 +147,7 @@ func main() {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "result not found",
 			})
+
 			return
 		}
 
@@ -135,6 +158,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "failed to parse result",
 			})
+
 			return
 		}
 
@@ -146,6 +170,9 @@ func main() {
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to upgrade to WebSocket",
+			})
 			return
 		}
 
@@ -167,6 +194,10 @@ func main() {
 			)
 
 			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "failed to send WebSocket message",
+				})
+
 				break
 			}
 		}
