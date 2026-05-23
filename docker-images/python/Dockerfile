@@ -2,4 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-CMD ["sleep", "infinity"]
+RUN useradd -m sandboxuser
+
+USER sandboxuser
+
+CMD ["python", "/app/main.py"]
