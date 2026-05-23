@@ -5,20 +5,30 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
 type PythonExecutor struct{}
 
 func (p PythonExecutor) Execute(code string, input string) (string, error) {
-	// Create temporary Python file
-	tempFile, err := os.CreateTemp("", "code-*.py")
+
+	// Create isolated execution directory
+	jobDir, err := os.MkdirTemp("", "execution-*")
 	if err != nil {
 		return "", err
 	}
 
-	// Cleanup temp file after execution
-	defer os.Remove(tempFile.Name())
+	// Cleanup execution directory after execution
+	defer os.RemoveAll(jobDir)
+
+	// Create main.py inside isolated directory
+	filePath := filepath.Join(jobDir, "main.py")
+
+	tempFile, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
 
 	// Write code into file
 	_, err = tempFile.WriteString(code)
@@ -47,7 +57,7 @@ func (p PythonExecutor) Execute(code string, input string) (string, error) {
 		"--pids-limit=64",
 		"--security-opt=no-new-privileges",
 		"-v",
-		tempFile.Name()+":/app/main.py",
+		filePath+":/app/main.py:ro",
 		"execution-python",
 		"python",
 		"/app/main.py",
