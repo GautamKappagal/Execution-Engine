@@ -5,20 +5,29 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
 type JavaScriptExecutor struct{}
 
 func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
-	// Create temporary JavaScript file
-	tempFile, err := os.CreateTemp("", "code-*.js")
+	// Create isolated execution directory
+	jobDir, err := os.MkdirTemp("", "execution-*")
 	if err != nil {
 		return "", err
 	}
 
-	// Cleanup temp file
-	defer os.Remove(tempFile.Name())
+	// Cleanup execution directory
+	defer os.RemoveAll(jobDir)
+
+	// Create main.js inside isolated directory
+	filePath := filepath.Join(jobDir, "main.js")
+
+	tempFile, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
 
 	// Write code into file
 	_, err = tempFile.WriteString(code)
@@ -38,12 +47,25 @@ func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
 		"docker",
 		"run",
 		"-i",
+		"--init",
 		"--rm",
 		"--network=none",
 		"--memory=128m",
 		"--cpus=0.5",
+		"--ulimit",
+		"nofile=1024:1024",
+		"--ulimit",
+		"nproc=64:64",
+		"--read-only",
+		"--tmpfs",
+		"/tmp:rw,nosuid,nodev,uid=1000,gid=1000",
+		"--user",
+		"1000:1000",
+		"--cap-drop=ALL",
+		"--pids-limit=64",
+		"--security-opt=no-new-privileges",
 		"-v",
-		tempFile.Name()+":/app/main.js",
+		filePath+":/app/main.js:ro",
 		"execution-javascript",
 		"node",
 		"/app/main.js",

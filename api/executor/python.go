@@ -12,7 +12,6 @@ import (
 type PythonExecutor struct{}
 
 func (p PythonExecutor) Execute(code string, input string) (string, error) {
-
 	// Create isolated execution directory
 	jobDir, err := os.MkdirTemp("", "execution-*")
 	if err != nil {
@@ -48,14 +47,25 @@ func (p PythonExecutor) Execute(code string, input string) (string, error) {
 		"docker",
 		"run",
 		"-i",
+		"--init",
 		"--rm",
 		"--network=none",
 		"--memory=128m",
 		"--cpus=0.5",
+		"--ulimit",
+		"nofile=1024:1024",
+		"--ulimit",
+		"nproc=64:64",
 		"--read-only",
+		"--tmpfs",
+		"/tmp:rw,nosuid,nodev,uid=1000,gid=1000",
+		"--user",
+		"1000:1000",
 		"--cap-drop=ALL",
 		"--pids-limit=64",
 		"--security-opt=no-new-privileges",
+		"-e",
+		"PYTHONDONTWRITEBYTECODE=1",
 		"-v",
 		filePath+":/app/main.py:ro",
 		"execution-python",

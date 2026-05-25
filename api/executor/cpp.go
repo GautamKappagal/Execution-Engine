@@ -5,19 +5,27 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
 type CPPExecutor struct{}
 
 func (c CPPExecutor) Execute(code string, input string) (string, error) {
-	// Create temp cpp file
-	tempFile, err := os.CreateTemp("", "code-*.cpp")
+	// Create isolated execution directory
+	jobDir, err := os.MkdirTemp("", "execution-*")
 	if err != nil {
 		return "", err
 	}
 
-	defer os.Remove(tempFile.Name())
+	defer os.RemoveAll(jobDir)
+
+	filePath := filepath.Join(jobDir, "main.cpp")
+
+	tempFile, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
 
 	_, err = tempFile.WriteString(code)
 	if err != nil {
@@ -36,16 +44,33 @@ func (c CPPExecutor) Execute(code string, input string) (string, error) {
 		"docker",
 		"run",
 		"-i",
+		"--init",
 		"--rm",
 		"--network=none",
 		"--memory=256m",
 		"--cpus=1",
+		"--ulimit",
+		"nofile=1024:1024",
+		"--ulimit",
+		"nproc=128:128",
+		"--read-only",
+		"--tmpfs",
+		"/tmp:rw,nosuid,nodev,uid=1000,gid=1000",
+		"--tmpfs",
+		"/work:rw,exec,nosuid,nodev,size=128m,uid=1000,gid=1000",
+		"--workdir",
+		"/work",
+		"--user",
+		"1000:1000",
+		"--cap-drop=ALL",
+		"--pids-limit=128",
+		"--security-opt=no-new-privileges",
 		"-v",
-		tempFile.Name()+":/app/main.cpp",
+		filePath+":/src/main.cpp:ro",
 		"execution-cpp",
 		"sh",
 		"-c",
-		"g++ /app/main.cpp -o /app/main && /app/main",
+		"g++ /src/main.cpp -O2 -pipe -o /work/main && /work/main",
 	)
 
 	stdin, err := cmd.StdinPipe()

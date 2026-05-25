@@ -136,6 +136,11 @@ Client fetches execution status/result
 
 The execution engine applies multiple isolation and security mechanisms:
 
+## Threat Model Notes (Important)
+
+- The worker talks to the host Docker daemon (via `/var/run/docker.sock` in `docker-compose.yml`). Any service with access to the Docker socket can effectively gain root-equivalent control over the host. This is acceptable for local demos, but **not** safe for multi-tenant or internet-exposed deployments.
+- For a production-grade setup, run workers on dedicated/isolated machines (or a separate sandbox cluster) and avoid exposing the Docker socket to untrusted components.
+
 ## Container Isolation
 
 - Docker sandbox execution
@@ -170,6 +175,15 @@ All executions are forcibly terminated after timeout expiration.
 - Temporary execution artifacts
 - Automatic cleanup
 - No persistent runtime state
+
+## Additional Hardening Used
+
+- Non-root container user (numeric `uid:gid`)
+- Read-only container root filesystem (`--read-only`)
+- Private writable tmpfs mounts for `/tmp` and (for C++) `/work`
+- Dropped Linux capabilities (`--cap-drop=ALL`)
+- No-new-privileges (`--security-opt=no-new-privileges`)
+- Process count limits (`--pids-limit`) and basic ulimits (`nofile`, `nproc`)
 
 ---
 
@@ -331,6 +345,24 @@ curl http://localhost:8080/result/<JOB_ID>
 
 ---
 
+## CLI (Recommended Demo)
+
+Run from repo root:
+
+```bash
+cd cli
+go run . --lang python --code 'print("hello from cli")' --wait
+```
+
+Stream logs over WebSocket while waiting:
+
+```bash
+cd cli
+go run . --lang python --file ../examples/hello.py --stream --wait
+```
+
+---
+
 # Project Structure
 
 ```text
@@ -358,6 +390,10 @@ Execution-Engine/
 ├── worker/
 │   ├── main.go
 │   ├── Dockerfile
+│   └── go.mod
+│
+├── cli/
+│   ├── main.go
 │   └── go.mod
 │
 ├── docker-images/
