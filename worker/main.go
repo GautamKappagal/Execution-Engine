@@ -15,7 +15,6 @@ import (
 var ctx = context.Background()
 
 func main() {
-
 	client := goredis.NewClient(&goredis.Options{
 		Addr: "redis:6379",
 	})
@@ -112,19 +111,18 @@ func main() {
 		}
 
 		var output string
-		var err error
+		var execErr error
 		if streamingExec, ok := exec.(executor.StreamingExecutor); ok {
-			output, err = streamingExec.ExecuteWithOutput(job.Code, job.Input, emit)
+			output, execErr = streamingExec.ExecuteWithOutput(job.Code, job.Input, emit)
 		} else {
-			output, err = exec.Execute(job.Code, job.Input)
+			output, execErr = exec.Execute(job.Code, job.Input)
 			emit(output)
 		}
 
-		if err != nil {
-
+		if execErr != nil {
 			status := "failed"
 
-			if err.Error() == "execution timed out" {
+			if execErr.Error() == "execution timed out" {
 				status = "timed_out"
 			}
 
@@ -133,14 +131,14 @@ func main() {
 				JobID:    job.ID,
 				Language: job.Language,
 				Status:   status,
-				Error:    err.Error(),
+				Error:    execErr.Error(),
 			})
 
 			failedResult := models.ExecutionResult{
 				ID:     job.ID,
 				Status: status,
 				Output: output,
-				Error:  err.Error(),
+				Error:  execErr.Error(),
 			}
 
 			failedJSON, _ := json.Marshal(failedResult)
