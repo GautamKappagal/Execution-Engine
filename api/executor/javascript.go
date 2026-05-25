@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -12,6 +13,10 @@ import (
 type JavaScriptExecutor struct{}
 
 func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
+	return j.ExecuteWithOutput(code, input, nil)
+}
+
+func (j JavaScriptExecutor) ExecuteWithOutput(code string, input string, onOutput func(chunk string)) (string, error) {
 	// Create isolated execution directory
 	jobDir, err := os.MkdirTemp("", "execution-*")
 	if err != nil {
@@ -71,6 +76,11 @@ func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
 		"/app/main.js",
 	)
 
+	var outputBuf bytes.Buffer
+	outWriter := newLockedWriter(&outputBuf, onOutput)
+	cmd.Stdout = outWriter
+	cmd.Stderr = outWriter
+
 	// Create stdin pipe
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -84,7 +94,10 @@ func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
 	}()
 
 	// Execute command
-	output, err := cmd.CombinedOutput()
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	err = cmd.Wait()
 
 	// Handle timeout
 	if ctx.Err() == context.DeadlineExceeded {
@@ -93,8 +106,8 @@ func (j JavaScriptExecutor) Execute(code string, input string) (string, error) {
 
 	// Return stderr/stdout
 	if err != nil {
-		return string(output), err
+		return outputBuf.String(), err
 	}
 
-	return string(output), nil
+	return outputBuf.String(), nil
 }

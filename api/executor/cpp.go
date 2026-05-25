@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -12,6 +13,10 @@ import (
 type CPPExecutor struct{}
 
 func (c CPPExecutor) Execute(code string, input string) (string, error) {
+	return c.ExecuteWithOutput(code, input, nil)
+}
+
+func (c CPPExecutor) ExecuteWithOutput(code string, input string, onOutput func(chunk string)) (string, error) {
 	// Create isolated execution directory
 	jobDir, err := os.MkdirTemp("", "execution-*")
 	if err != nil {
@@ -73,6 +78,11 @@ func (c CPPExecutor) Execute(code string, input string) (string, error) {
 		"g++ /src/main.cpp -O2 -pipe -o /work/main && /work/main",
 	)
 
+	var outputBuf bytes.Buffer
+	outWriter := newLockedWriter(&outputBuf, onOutput)
+	cmd.Stdout = outWriter
+	cmd.Stderr = outWriter
+
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return "", err
@@ -83,15 +93,18 @@ func (c CPPExecutor) Execute(code string, input string) (string, error) {
 		stdin.Write([]byte(input))
 	}()
 
-	output, err := cmd.CombinedOutput()
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	err = cmd.Wait()
 
 	if ctx.Err() == context.DeadlineExceeded {
 		return "", errors.New("execution timed out")
 	}
 
 	if err != nil {
-		return string(output), err
+		return outputBuf.String(), err
 	}
 
-	return string(output), nil
+	return outputBuf.String(), nil
 }

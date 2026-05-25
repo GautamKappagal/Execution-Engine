@@ -83,6 +83,7 @@ func main() {
 		Code:     code,
 		Input:    input,
 	})
+
 	if err != nil {
 		fatalf("submit: %v", err)
 	}
@@ -118,6 +119,7 @@ func main() {
 	if result.Output != "" {
 		fmt.Print(result.Output)
 	}
+
 	if result.Error != "" {
 		fmt.Fprintf(os.Stderr, "error=%s\n", result.Error)
 	}
@@ -133,12 +135,14 @@ func submit(ctx context.Context, apiBase string, req executeRequest) (string, er
 	if err != nil {
 		return "", err
 	}
+
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", err
 	}
+
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
@@ -154,12 +158,15 @@ func submit(ctx context.Context, apiBase string, req executeRequest) (string, er
 	if err := json.Unmarshal(respBody, &out); err != nil {
 		return "", err
 	}
+
 	if out.JobID == "" {
 		if out.Error != "" {
 			return "", errors.New(out.Error)
 		}
+
 		return "", fmt.Errorf("missing job_id in response: %s", strings.TrimSpace(string(respBody)))
 	}
+
 	return out.JobID, nil
 }
 
@@ -186,6 +193,7 @@ func waitForResult(ctx context.Context, apiBase string, jobID string, pollInterv
 
 func fetchResult(ctx context.Context, apiBase string, jobID string) (executionResult, bool, error) {
 	url := strings.TrimRight(apiBase, "/") + "/result/" + jobID
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return executionResult{}, false, err
@@ -195,6 +203,7 @@ func fetchResult(ctx context.Context, apiBase string, jobID string) (executionRe
 	if err != nil {
 		return executionResult{}, false, err
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
@@ -205,6 +214,7 @@ func fetchResult(ctx context.Context, apiBase string, jobID string) (executionRe
 	if err != nil {
 		return executionResult{}, false, err
 	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return executionResult{}, false, fmt.Errorf("http %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
@@ -237,6 +247,7 @@ func streamLogs(ctx context.Context, apiBase string, jobID string, w io.Writer) 
 	if err != nil {
 		return err
 	}
+
 	defer conn.Close()
 
 	for {
@@ -255,6 +266,7 @@ func streamLogs(ctx context.Context, apiBase string, jobID string, w io.Writer) 
 			if _, err := w.Write(msg); err != nil {
 				return err
 			}
+
 			if msg[len(msg)-1] != '\n' {
 				if _, err := io.WriteString(w, "\n"); err != nil {
 					return err
@@ -268,20 +280,25 @@ func readCode(filePath, codeInline string) (string, error) {
 	if strings.TrimSpace(codeInline) != "" {
 		return codeInline, nil
 	}
+
 	if strings.TrimSpace(filePath) == "" {
 		return "", errors.New("provide --file or --code")
 	}
+
 	if filePath == "-" {
 		b, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
 		return string(b), err
 	}
+
 	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}
+
 	if len(b) > 1<<20 {
 		return "", errors.New("code file too large (max 1MB)")
 	}
+
 	return string(b), nil
 }
 
@@ -289,17 +306,21 @@ func readOptionalInput(inputPath string) (string, error) {
 	if strings.TrimSpace(inputPath) == "" {
 		return "", nil
 	}
+
 	if inputPath == "-" {
 		b, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
 		return string(b), err
 	}
+
 	b, err := os.ReadFile(inputPath)
 	if err != nil {
 		return "", err
 	}
+
 	if len(b) > 1<<20 {
 		return "", errors.New("input file too large (max 1MB)")
 	}
+
 	return string(b), nil
 }
 
@@ -307,6 +328,7 @@ func envOrDefault(key, def string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
 	}
+
 	return def
 }
 
@@ -314,4 +336,3 @@ func fatalf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(2)
 }
-

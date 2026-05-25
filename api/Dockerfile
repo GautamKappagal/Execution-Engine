@@ -1,11 +1,14 @@
-FROM golang:1.26
+FROM golang:1.22-bookworm AS build
 
-WORKDIR /app
-
+WORKDIR /src
 COPY . .
 
-WORKDIR /app/api
+WORKDIR /src/api
+RUN go mod download
+RUN CGO_ENABLED=0 go build -o /out/api .
 
-RUN go mod tidy
-
-CMD ["go", "run", "main.go"]
+FROM gcr.io/distroless/base-debian12
+WORKDIR /app
+COPY --from=build /out/api /app/api
+EXPOSE 8080
+ENTRYPOINT ["/app/api"]

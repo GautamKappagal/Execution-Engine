@@ -100,7 +100,25 @@ func main() {
 			continue
 		}
 
-		output, err := exec.Execute(job.Code, job.Input)
+		emit := func(chunk string) {
+			if chunk == "" {
+				return
+			}
+			client.Publish(
+				ctx,
+				"logs:"+job.ID,
+				chunk,
+			)
+		}
+
+		var output string
+		var err error
+		if streamingExec, ok := exec.(executor.StreamingExecutor); ok {
+			output, err = streamingExec.ExecuteWithOutput(job.Code, job.Input, emit)
+		} else {
+			output, err = exec.Execute(job.Code, job.Input)
+			emit(output)
+		}
 
 		if err != nil {
 
@@ -137,12 +155,7 @@ func main() {
 			continue
 		}
 
-		// Publish execution logs
-		client.Publish(
-			ctx,
-			"logs:"+job.ID,
-			output,
-		)
+		// Output has already been published incrementally via emit().
 
 		logger.Log(logger.LogEvent{
 			Event:    "job_completed",

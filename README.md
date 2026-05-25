@@ -361,6 +361,20 @@ cd cli
 go run . --lang python --file ../examples/hello.py --stream --wait
 ```
 
+Run JavaScript:
+
+```bash
+cd cli
+go run . --lang javascript --file ../examples/hello.js --wait
+```
+
+Run C++:
+
+```bash
+cd cli
+go run . --lang cpp --file ../examples/hello.cpp --wait
+```
+
 ---
 
 # Project Structure
@@ -430,7 +444,7 @@ Execution-Engine/
 
 # Current Limitations
 
-- Final output streaming only
+- Log streaming is best-effort (depends on runtime buffering)
 - No authentication
 - No rate limiting
 - No persistent database
